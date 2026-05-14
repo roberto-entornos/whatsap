@@ -22,6 +22,11 @@ function InputBox({ enviarMensaje }) {
                 placeholder="Escribe un mensaje aquí"
                 value={texto}
                 onChange={escribir}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                        pulsarBoton();
+                    }
+                }}
             />
             <button
                 onClick={pulsarBoton}

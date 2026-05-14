@@ -91,6 +91,10 @@ function Login({ iniciarSesion }) {
             onChange={(e) => setTelefono(e.target.value)}
             className="border border-gray-300 p-2 rounded focus:outline-none focus:border-green-500"
             required
+            minLength="9"
+            maxLength="15"
+            pattern="[0-9]{9,15}"
+            title="El teléfono debe tener entre 9 y 15 dígitos numéricos."
           />
           <input
             type="password"

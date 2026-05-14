@@ -23,11 +23,18 @@ function Sidebar({ contactos, chatActivo, hacerClick, mensajes, usuario, cerrarS
                         className="flex-1 bg-[#f0f2f5] p-2 rounded-lg text-sm outline-none border border-transparent focus:border-green-500 focus:bg-white transition-colors"
                         value={nuevoTelefono}
                         onChange={(e) => setNuevoTelefono(e.target.value)}
+                        maxLength="15"
                     />
                     <button
                         onClick={() => {
-                            if (nuevoTelefono.trim() !== '') {
-                                agregarContacto(nuevoTelefono.trim());
+                            const telStr = nuevoTelefono.trim();
+                            if (telStr !== '') {
+                                const isNum = /^\d+$/.test(telStr);
+                                if (!isNum || telStr.length < 9 || telStr.length > 15) {
+                                    alert("El teléfono debe tener entre 9 y 15 dígitos numéricos.");
+                                    return;
+                                }
+                                agregarContacto(telStr);
                                 setNuevoTelefono('');
                             }
                         }}
