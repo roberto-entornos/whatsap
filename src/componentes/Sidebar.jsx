@@ -1,12 +1,7 @@
 import React, { useState } from 'react';
 
-function Sidebar({ contactos, chatActivo, hacerClick, mensajes, usuario, cerrarSesion }) {
-    const [busqueda, setBusqueda] = useState('');
-
-    const contactosFiltrados = contactos.filter(c => 
-        c.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-        c.correo.toLowerCase().includes(busqueda.toLowerCase())
-    );
+function Sidebar({ contactos, chatActivo, hacerClick, mensajes, usuario, cerrarSesion, agregarContacto }) {
+    const [nuevoTelefono, setNuevoTelefono] = useState('');
 
     return (
         <div className="w-[30%] border-r border-[#e9edef] flex flex-col bg-white">
@@ -14,26 +9,39 @@ function Sidebar({ contactos, chatActivo, hacerClick, mensajes, usuario, cerrarS
                 <h3 className="text-xl font-bold text-gray-700">Chats</h3>
                 <button 
                     onClick={cerrarSesion}
-                    className="text-sm text-red-500 hover:bg-red-100 px-2 py-1 rounded font-semibold transition"
+                    className="text-sm text-red-500 hover:bg-red-100 px-2 py-1 rounded font-semibold transition cursor-pointer"
                 >
                     Cerrar Sesión
                 </button>
             </div>
 
-            <div className="bg-white p-2 border-b border-[#e9edef]">
-                <input 
-                    type="text"
-                    placeholder="Busca un chat o contacto"
-                    className="w-full bg-[#f0f2f5] p-2 rounded-lg text-sm outline-none"
-                    value={busqueda}
-                    onChange={(e) => setBusqueda(e.target.value)}
-                />
+            <div className="bg-white p-2 border-b border-[#e9edef] flex flex-col gap-2">
+                <div className="flex gap-2">
+                    <input 
+                        type="tel"
+                        placeholder="Añadir por teléfono"
+                        className="flex-1 bg-[#f0f2f5] p-2 rounded-lg text-sm outline-none border border-transparent focus:border-green-500 focus:bg-white transition-colors"
+                        value={nuevoTelefono}
+                        onChange={(e) => setNuevoTelefono(e.target.value)}
+                    />
+                    <button
+                        onClick={() => {
+                            if (nuevoTelefono.trim() !== '') {
+                                agregarContacto(nuevoTelefono.trim());
+                                setNuevoTelefono('');
+                            }
+                        }}
+                        className="bg-[#00a884] text-white px-3 py-1 rounded hover:bg-[#008f6f] font-bold text-sm transition-colors cursor-pointer"
+                    >
+                        Añadir
+                    </button>
+                </div>
             </div>
 
             <div className="flex-1 overflow-y-auto">
-                {contactosFiltrados.length === 0 ? (
+                {contactos.length === 0 ? (
                     <p className="text-center text-gray-500 mt-4 text-sm">No se encontraron contactos</p>
-                ) : contactosFiltrados.map((contacto) => {
+                ) : contactos.map((contacto) => {
                     let clase = "flex items-center p-3 cursor-pointer border-b border-gray-100 hover:bg-gray-50";
                     if (chatActivo && chatActivo.id === contacto.id) {
                         clase = "flex items-center p-3 cursor-pointer border-b border-gray-100 bg-[#f0f2f5]";

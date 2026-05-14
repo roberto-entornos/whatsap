@@ -8,25 +8,22 @@ function WhatsApp({ usuario }) {
     const [contactos, setContactos] = useState([]);
     const [chatActivoId, setChatActivoId] = useState(null);
     const [mensajes, setMensajes] = useState([]);
-    const [cargando, setCargando] = useState(true);
 
     useEffect(() => {
         async function cargarDatos() {
-            const { data: dataContactos, error: errContactos } = await supabase
-                .from('usuarios')
-                .select('*')
-                .neq('id', usuario.id);
+            const idsSet = new Set();
 
-            if (dataContactos) {
-                setContactos(dataContactos);
-                if (dataContactos.length > 0) {
-                    setChatActivoId(dataContactos[0].id);
-                }
-            }
-            if (errContactos) {
-                console.error("Error al cargar contactos:", errContactos);
+            // 1. Cargar la lista de contactos explícitos
+            const { data: relContactos, error: errRel } = await supabase
+                .from('contactos')
+                .select('contacto_id')
+                .eq('usuario_id', usuario.id);
+
+            if (relContactos) {
+                relContactos.forEach(r => idsSet.add(r.contacto_id));
             }
 
+            // 2. Cargar mensajes y extraer contactos
             const { data: dataMensajes, error: errMensajes } = await supabase
                 .from('mensajes')
                 .select('*')
@@ -35,12 +32,31 @@ function WhatsApp({ usuario }) {
 
             if (dataMensajes) {
                 setMensajes(dataMensajes);
+                dataMensajes.forEach(m => {
+                    if (m.emisor_id !== usuario.id) idsSet.add(m.emisor_id);
+                    if (m.receptor_id !== usuario.id) idsSet.add(m.receptor_id);
+                });
             }
+
+            if (idsSet.size > 0) {
+                const { data: dataContactos, error: errContactos } = await supabase
+                    .from('usuarios')
+                    .select('*')
+                    .in('id', Array.from(idsSet));
+
+                if (dataContactos) {
+                    setContactos(dataContactos);
+                    if (dataContactos.length > 0) {
+                        setChatActivoId(dataContactos[0].id);
+                    }
+                }
+            } else {
+                setContactos([]);
+            }
+
             if (errMensajes) {
                 console.error("Error al cargar mensajes:", errMensajes);
             }
-
-            setCargando(false);
         }
 
         cargarDatos();
@@ -53,6 +69,19 @@ function WhatsApp({ usuario }) {
                     setMensajes((prev) => {
                         if (prev.find(m => m.id === nuevo.id)) return prev;
                         return [...prev, nuevo];
+                    });
+
+                    // Asegurarnos de que el contacto aparece en la lista
+                    const otroId = nuevo.emisor_id === usuario.id ? nuevo.receptor_id : nuevo.emisor_id;
+                    supabase.from('usuarios').select('*').eq('id', otroId).single().then(({ data }) => {
+                        if (data) {
+                            setContactos((prev) => {
+                                if (!prev.find(c => c.id === otroId)) {
+                                    return [...prev, data];
+                                }
+                                return prev;
+                            });
+                        }
                     });
                 }
             })
@@ -72,6 +101,40 @@ function WhatsApp({ usuario }) {
 
     const cambiarChat = (contacto) => {
         setChatActivoId(contacto.id);
+    };
+
+    const agregarContacto = async (telefonoNuevo) => {
+        const { data, error } = await supabase
+            .from('usuarios')
+            .select('*')
+            .eq('telefono', telefonoNuevo)
+            .single();
+
+        if (data) {
+            if (data.id === usuario.id) {
+                alert("No puedes agregarte a ti mismo.");
+                return;
+            }
+            if (contactos.find(c => c.id === data.id)) {
+                alert("Este contacto ya está en tu lista.");
+                return;
+            }
+
+            // Guardar en la base de datos
+            const { error: insertError } = await supabase
+                .from('contactos')
+                .insert([{ usuario_id: usuario.id, contacto_id: data.id }]);
+
+            if (insertError) {
+                console.error("Error al añadir contacto:", insertError);
+            } else {
+                const nuevosContactos = [...contactos, data];
+                setContactos(nuevosContactos);
+                setChatActivoId(data.id);
+            }
+        } else {
+            alert("No se encontró ningún usuario con ese número de teléfono.");
+        }
     };
 
     const enviarMensaje = async (texto) => {
@@ -112,6 +175,7 @@ function WhatsApp({ usuario }) {
                     mensajes={mensajes}
                     usuario={usuario}
                     cerrarSesion={cerrarSesion}
+                    agregarContacto={agregarContacto}
                 />
 
                 <div className="flex flex-col flex-1 bg-[#efeae2]">

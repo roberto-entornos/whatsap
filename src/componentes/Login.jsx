@@ -3,7 +3,7 @@ import { supabase } from '../supabaseClient';
 
 function Login({ iniciarSesion }) {
   const [nombre, setNombre] = useState('');
-  const [correo, setCorreo] = useState('');
+  const [telefono, setTelefono] = useState('');
   const [contrasena, setContrasena] = useState('');
   const [registro, setregistro] = useState(false);
   const [error, setError] = useState('');
@@ -15,8 +15,9 @@ function Login({ iniciarSesion }) {
     setMensajeExito('');
 
     if (registro) {
+      const emailFalso = `${telefono}@whatsapp.com`;
       const { data, error } = await supabase.auth.signUp({
-        email: correo,
+        email: emailFalso,
         password: contrasena,
       });
       if (error) {
@@ -34,7 +35,8 @@ function Login({ iniciarSesion }) {
         const { error: errorInsert } = await supabase.from('usuarios').insert([{
           id: data.user.id,
           nombre: nombre,
-          correo: correo,
+          correo: emailFalso,
+          telefono: telefono,
           color: colorAleatorio
         }]);
 
@@ -48,8 +50,9 @@ function Login({ iniciarSesion }) {
         }
       }
     } else {
+      const emailFalso = `${telefono}@whatsapp.com`;
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: correo,
+        email: emailFalso,
         password: contrasena,
       });
       if (error) {
@@ -82,10 +85,10 @@ function Login({ iniciarSesion }) {
             />
           )}
           <input
-            type="email"
-            placeholder="Correo electrónico"
-            value={correo}
-            onChange={(e) => setCorreo(e.target.value)}
+            type="tel"
+            placeholder="Número de teléfono"
+            value={telefono}
+            onChange={(e) => setTelefono(e.target.value)}
             className="border border-gray-300 p-2 rounded focus:outline-none focus:border-green-500"
             required
           />
@@ -97,7 +100,7 @@ function Login({ iniciarSesion }) {
             className="border border-gray-300 p-2 rounded focus:outline-none focus:border-green-500"
             required
           />
-          <button type="submit" className="bg-[#00a884] text-white p-2 rounded hover:bg-[#008f6f] font-bold mt-2">
+          <button type="submit" className="bg-[#00a884] text-white p-2 rounded hover:bg-[#008f6f] font-bold mt-2 cursor-pointer">
             {registro ? 'Registrarse' : 'Entrar'}
           </button>
         </form>
@@ -106,7 +109,7 @@ function Login({ iniciarSesion }) {
           {registro ? '¿Ya tienes cuenta? ' : '¿No tienes cuenta? '}
           <button
             onClick={() => setregistro(!registro)}
-            className="text-blue-500 hover:underline font-semibold"
+            className="text-blue-500 hover:underline font-semibold cursor-pointer"
           >
             {registro ? 'Inicia sesión' : 'Regístrate aquí'}
           </button>
