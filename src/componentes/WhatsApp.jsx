@@ -104,9 +104,6 @@ function WhatsApp({ usuario, cerrarSesionApp }) {
         });
 
         if (peticionBuscar.ok === false) {
-            let respuestaError = await peticionBuscar.json();
-            let msg = respuestaError.message || respuestaError.details || JSON.stringify(respuestaError);
-            alert("Error al buscar el usuario: " + msg);
             return;
         }
 
@@ -135,9 +132,7 @@ function WhatsApp({ usuario, cerrarSesionApp }) {
                 setChatActivoId(data.id);
                 alert("¡Contacto añadido con éxito!");
             } else {
-                let respuestaError = await peticionInsertar.json();
-                let msg = respuestaError.message || respuestaError.details || JSON.stringify(respuestaError);
-                alert("Error al guardar el contacto en la base de datos: " + msg);
+                console.error("Error al añadir contacto");
             }
         } else {
             alert("No se encontró ningún usuario registrado con ese número de teléfono.");

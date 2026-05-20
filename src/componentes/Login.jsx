@@ -62,8 +62,7 @@ function Login({ iniciarSesion }) {
         let respuestaGuardar = await peticionGuardar.json();
 
         if (peticionGuardar.ok === false) {
-          let mensajeErrorGuardar = respuestaGuardar.message || respuestaGuardar.details || JSON.stringify(respuestaGuardar);
-          alert("Error al guardar el perfil de usuario: " + mensajeErrorGuardar);
+          alert("Error al guardar el perfil de usuario.");
         } else {
           alert("¡Registro completado!");
           setNombre('');
