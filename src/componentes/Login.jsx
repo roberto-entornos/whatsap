@@ -47,7 +47,7 @@ function Login({ iniciarSesion }) {
           method: 'POST',
           headers: {
             'apikey': supabaseKey,
-            'Authorization': 'Bearer ' + supabaseKey,
+            'Authorization': 'Bearer ' + (respuestaRegistro.session?.access_token || supabaseKey),
             'Content-Type': 'application/json',
             'Prefer': 'return=representation'
           },
@@ -63,7 +63,8 @@ function Login({ iniciarSesion }) {
         let respuestaGuardar = await peticionGuardar.json();
 
         if (peticionGuardar.ok === false) {
-          alert("Error al guardar el perfil de usuario.");
+          let mensajeErrorGuardar = respuestaGuardar.message || respuestaGuardar.details || JSON.stringify(respuestaGuardar);
+          alert("Error al guardar el perfil de usuario: " + mensajeErrorGuardar);
         } else {
           alert("¡Registro completado!");
           setNombre('');
