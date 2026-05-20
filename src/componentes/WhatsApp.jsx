@@ -102,14 +102,24 @@ function WhatsApp({ usuario, cerrarSesionApp }) {
             method: 'GET',
             headers: cabeceras
         });
+
+        if (peticionBuscar.ok === false) {
+            let respuestaError = await peticionBuscar.json();
+            let msg = respuestaError.message || respuestaError.details || JSON.stringify(respuestaError);
+            alert("Error al buscar el usuario: " + msg);
+            return;
+        }
+
         let respuestaBuscar = await peticionBuscar.json();
 
         if (respuestaBuscar.length > 0) {
             let data = respuestaBuscar[0];
             if (data.id === usuario.id) {
+                alert("No puedes añadirte a ti mismo como contacto.");
                 return;
             }
             if (contactos.find(c => c.id === data.id)) {
+                alert("Este contacto ya está en tu lista.");
                 return;
             }
 
@@ -123,9 +133,14 @@ function WhatsApp({ usuario, cerrarSesionApp }) {
                 const nuevosContactos = [...contactos, data];
                 setContactos(nuevosContactos);
                 setChatActivoId(data.id);
+                alert("¡Contacto añadido con éxito!");
             } else {
-                console.error("Error al añadir contacto");
+                let respuestaError = await peticionInsertar.json();
+                let msg = respuestaError.message || respuestaError.details || JSON.stringify(respuestaError);
+                alert("Error al guardar el contacto en la base de datos: " + msg);
             }
+        } else {
+            alert("No se encontró ningún usuario registrado con ese número de teléfono.");
         }
     };
 

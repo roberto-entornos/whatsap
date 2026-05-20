@@ -54,7 +54,6 @@ function Login({ iniciarSesion }) {
           body: JSON.stringify({
             id: respuestaRegistro.user.id,
             nombre: nombre,
-            correo: emailFalso,
             telefono: telefono,
             color: colorElegido
           })
