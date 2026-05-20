@@ -2,99 +2,87 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import ChatWindow from './ChatWindow';
 import InputBox from './InputBox';
-import { supabase } from '../supabaseClient';
 
-function WhatsApp({ usuario }) {
+const supabaseUrl = 'https://qlxxdrbxcjofttwxbpwr.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFseHhkcmJ4Y2pvZnR0d3hicHdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1OTUxMzMsImV4cCI6MjA5NDE3MTEzM30.s9xGl4QUebBUwR6PCFeR4KPsZlpwRgF-1NPdpaQu3zo';
+
+function WhatsApp({ usuario, cerrarSesionApp }) {
     const [contactos, setContactos] = useState([]);
     const [chatActivoId, setChatActivoId] = useState(null);
     const [mensajes, setMensajes] = useState([]);
 
     useEffect(() => {
         async function cargarDatos() {
-            const idsSet = new Set();
+            let cabeceras = {
+                'apikey': supabaseKey,
+                'Authorization': 'Bearer ' + (usuario.token || supabaseKey)
+            };
 
-            // 1. Cargar la lista de contactos explícitos
-            const { data: relContactos, error: errRel } = await supabase
-                .from('contactos')
-                .select('contacto_id')
-                .eq('usuario_id', usuario.id);
+            let peticionContactos = await fetch(supabaseUrl + '/rest/v1/contactos?usuario_id=eq.' + usuario.id + '&select=contacto_id', {
+                method: 'GET',
+                headers: cabeceras
+            });
+            let respuestaContactos = await peticionContactos.json();
 
-            if (relContactos) {
-                relContactos.forEach(r => idsSet.add(r.contacto_id));
-            }
-
-            // 2. Cargar mensajes y extraer contactos
-            const { data: dataMensajes, error: errMensajes } = await supabase
-                .from('mensajes')
-                .select('*')
-                .or(`emisor_id.eq.${usuario.id},receptor_id.eq.${usuario.id}`)
-                .order('created_at', { ascending: true });
-
-            if (dataMensajes) {
-                setMensajes(dataMensajes);
-                dataMensajes.forEach(m => {
-                    if (m.emisor_id !== usuario.id) idsSet.add(m.emisor_id);
-                    if (m.receptor_id !== usuario.id) idsSet.add(m.receptor_id);
-                });
-            }
-
-            if (idsSet.size > 0) {
-                const { data: dataContactos, error: errContactos } = await supabase
-                    .from('usuarios')
-                    .select('*')
-                    .in('id', Array.from(idsSet));
-
-                if (dataContactos) {
-                    setContactos(dataContactos);
-                    if (dataContactos.length > 0) {
-                        setChatActivoId(dataContactos[0].id);
+            let listaIds = [];
+            if (respuestaContactos.length >= 0) {
+                for (let i = 0; i < respuestaContactos.length; i++) {
+                    let id = respuestaContactos[i].contacto_id;
+                    if (!listaIds.includes(id)) {
+                        listaIds.push(id);
                     }
+                }
+            }
+
+            let urlMensajes = supabaseUrl + '/rest/v1/mensajes?select=*&or=(emisor_id.eq.' + usuario.id + ',receptor_id.eq.' + usuario.id + ')&order=created_at.asc';
+            let peticionMensajes = await fetch(urlMensajes, {
+                method: 'GET',
+                headers: cabeceras
+            });
+            let respuestaMensajes = await peticionMensajes.json();
+
+            if (respuestaMensajes.length >= 0) {
+                setMensajes(respuestaMensajes);
+                for (let i = 0; i < respuestaMensajes.length; i++) {
+                    let m = respuestaMensajes[i];
+                    if (m.emisor_id !== usuario.id && !listaIds.includes(m.emisor_id)) {
+                        listaIds.push(m.emisor_id);
+                    }
+                    if (m.receptor_id !== usuario.id && !listaIds.includes(m.receptor_id)) {
+                        listaIds.push(m.receptor_id);
+                    }
+                }
+            }
+
+            if (listaIds.length > 0) {
+                let idsString = listaIds.join(',');
+                let urlUsuarios = supabaseUrl + '/rest/v1/usuarios?select=*&id=in.(' + idsString + ')';
+                let peticionUsuarios = await fetch(urlUsuarios, {
+                    method: 'GET',
+                    headers: cabeceras
+                });
+                let respuestaUsuarios = await peticionUsuarios.json();
+
+                if (respuestaUsuarios.length >= 0) {
+                    setContactos(respuestaUsuarios);
+                    setChatActivoId((chatActual) => {
+                        if (chatActual) return chatActual;
+                        if (respuestaUsuarios.length > 0) return respuestaUsuarios[0].id;
+                        return null;
+                    });
                 }
             } else {
                 setContactos([]);
-            }
-
-            if (errMensajes) {
-                console.error("Error al cargar mensajes:", errMensajes);
             }
         }
 
         cargarDatos();
 
-        const canalMensajes = supabase
-            .channel('public:mensajes')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, (payload) => {
-                const nuevo = payload.new;
-                if (nuevo.emisor_id === usuario.id || nuevo.receptor_id === usuario.id) {
-                    setMensajes((prev) => {
-                        if (prev.find(m => m.id === nuevo.id)) return prev;
-                        return [...prev, nuevo];
-                    });
-
-                    // Asegurarnos de que el contacto aparece en la lista
-                    const otroId = nuevo.emisor_id === usuario.id ? nuevo.receptor_id : nuevo.emisor_id;
-                    supabase.from('usuarios').select('*').eq('id', otroId).single().then(({ data }) => {
-                        if (data) {
-                            setContactos((prev) => {
-                                if (!prev.find(c => c.id === otroId)) {
-                                    return [...prev, data];
-                                }
-                                return prev;
-                            });
-                        }
-                    });
-                }
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(canalMensajes);
-        };
     }, [usuario.id]);
 
     const chatActivo = contactos.find(c => c.id === chatActivoId);
 
-    const mensajesDelChat = mensajes.filter(m => 
+    const mensajesDelChat = mensajes.filter(m =>
         (m.receptor_id === chatActivoId && m.emisor_id === usuario.id) ||
         (m.emisor_id === chatActivoId && m.receptor_id === usuario.id)
     );
@@ -104,64 +92,89 @@ function WhatsApp({ usuario }) {
     };
 
     const agregarContacto = async (telefonoNuevo) => {
-        const { data, error } = await supabase
-            .from('usuarios')
-            .select('*')
-            .eq('telefono', telefonoNuevo)
-            .single();
+        let cabeceras = {
+            'apikey': supabaseKey,
+            'Authorization': 'Bearer ' + (usuario.token || supabaseKey),
+            'Content-Type': 'application/json'
+        };
 
-        if (data) {
+        let peticionBuscar = await fetch(supabaseUrl + '/rest/v1/usuarios?telefono=eq.' + telefonoNuevo + '&select=*', {
+            method: 'GET',
+            headers: cabeceras
+        });
+        let respuestaBuscar = await peticionBuscar.json();
+
+        if (respuestaBuscar.length > 0) {
+            let data = respuestaBuscar[0];
             if (data.id === usuario.id) {
-                alert("No puedes agregarte a ti mismo.");
                 return;
             }
             if (contactos.find(c => c.id === data.id)) {
-                alert("Este contacto ya está en tu lista.");
                 return;
             }
 
-            // Guardar en la base de datos
-            const { error: insertError } = await supabase
-                .from('contactos')
-                .insert([{ usuario_id: usuario.id, contacto_id: data.id }]);
+            let peticionInsertar = await fetch(supabaseUrl + '/rest/v1/contactos', {
+                method: 'POST',
+                headers: cabeceras,
+                body: JSON.stringify({ usuario_id: usuario.id, contacto_id: data.id })
+            });
 
-            if (insertError) {
-                console.error("Error al añadir contacto:", insertError);
-            } else {
+            if (peticionInsertar.ok) {
                 const nuevosContactos = [...contactos, data];
                 setContactos(nuevosContactos);
                 setChatActivoId(data.id);
+            } else {
+                console.error("Error al añadir contacto");
             }
-        } else {
-            alert("No se encontró ningún usuario con ese número de teléfono.");
         }
     };
 
     const enviarMensaje = async (texto) => {
-        const horaTexto = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        let horaTexto = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        const nuevoMensaje = {
+        let nuevoMensaje = {
             receptor_id: chatActivoId,
             texto: texto,
             hora: horaTexto,
             emisor_id: usuario.id
         };
 
-        const { data, error } = await supabase
-            .from('mensajes')
-            .insert([nuevoMensaje])
-            .select();
-            
+        let cabeceras = {
+            'apikey': supabaseKey,
+            'Authorization': 'Bearer ' + (usuario.token || supabaseKey),
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+        };
+
+        let peticionEnviar = await fetch(supabaseUrl + '/rest/v1/mensajes', {
+            method: 'POST',
+            headers: cabeceras,
+            body: JSON.stringify(nuevoMensaje)
+        });
+
+        let data = await peticionEnviar.json();
+
         if (data && data.length > 0) {
-            setMensajes((prev) => {
-                if (prev.find(m => m.id === data[0].id)) return prev;
-                return [...prev, data[0]];
+            setMensajes((mensajesAnteriores) => {
+                let existe = false;
+                for (let i = 0; i < mensajesAnteriores.length; i++) {
+                    if (mensajesAnteriores[i].id === data[0].id) {
+                        existe = true;
+                    }
+                }
+                if (existe) {
+                    return mensajesAnteriores;
+                } else {
+                    return [...mensajesAnteriores, data[0]];
+                }
             });
         }
     };
 
-    const cerrarSesion = async () => {
-        await supabase.auth.signOut();
+    const cerrarSesion = () => {
+        if (cerrarSesionApp) {
+            cerrarSesionApp();
+        }
     };
 
     return (

@@ -3,37 +3,46 @@ import { createRoot } from 'react-dom/client';
 import "./styles/index.css";
 import Login from './componentes/Login';
 import WhatsApp from './componentes/WhatsApp';
-import { supabase } from './supabaseClient';
 
 function AplicacionPrincipal() {
   const [usuario, setUsuario] = useState(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setUsuario(session.user);
+    let usuarioGuardado = localStorage.getItem("miTokenDeUsuario");
+    let tokenGuardado = localStorage.getItem("miTokenDeAcceso");
+    if (usuarioGuardado && usuarioGuardado !== "undefined") {
+      try {
+        let usuarioObjeto = JSON.parse(usuarioGuardado);
+        if (usuarioObjeto) {
+          usuarioObjeto.token = tokenGuardado;
+          setUsuario(usuarioObjeto);
+        }
+      } catch (e) {
+        localStorage.removeItem("miTokenDeUsuario");
+        localStorage.removeItem("miTokenDeAcceso");
       }
-    });
-
-    const { data: oyenteAuth } = supabase.auth.onAuthStateChange((evento, sesion) => {
-      if (sesion) {
-        setUsuario(sesion.user);
-      } else {
-        setUsuario(null);
-      }
-    });
-
-    return () => {
-      oyenteAuth.subscription.unsubscribe();
-    };
+    }
   }, []);
 
   return (
     <div>
       {usuario ? (
-        <WhatsApp usuario={usuario} />
+        <WhatsApp 
+            usuario={usuario} 
+            cerrarSesionApp={() => {
+                localStorage.removeItem("miTokenDeUsuario");
+                localStorage.removeItem("miTokenDeAcceso");
+                setUsuario(null);
+            }} 
+        />
       ) : (
-        <Login iniciarSesion={(u) => setUsuario(u)} />
+        <Login iniciarSesion={(datosLogin) => {
+            localStorage.setItem("miTokenDeUsuario", JSON.stringify(datosLogin.user));
+            localStorage.setItem("miTokenDeAcceso", datosLogin.access_token);
+            let usuarioObjeto = datosLogin.user;
+            usuarioObjeto.token = datosLogin.access_token;
+            setUsuario(usuarioObjeto);
+        }} />
       )}
     </div>
   );

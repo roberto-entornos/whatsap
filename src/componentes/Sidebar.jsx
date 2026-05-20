@@ -27,14 +27,17 @@ function Sidebar({ contactos, chatActivo, hacerClick, mensajes, usuario, cerrarS
                     />
                     <button
                         onClick={() => {
-                            const telStr = nuevoTelefono.trim();
-                            if (telStr !== '') {
-                                const isNum = /^\d+$/.test(telStr);
-                                if (!isNum || telStr.length < 9 || telStr.length > 15) {
-                                    alert("El teléfono debe tener entre 9 y 15 dígitos numéricos.");
+                            let numero = nuevoTelefono;
+                            if (numero !== '') {
+                                if (isNaN(numero)) {
+                                    alert("Solo se permiten números");
                                     return;
                                 }
-                                agregarContacto(telStr);
+                                if (numero.length < 9 || numero.length > 15) {
+                                    alert("El número debe tener entre 9 y 15 dígitos");
+                                    return;
+                                }
+                                agregarContacto(numero);
                                 setNuevoTelefono('');
                             }
                         }}

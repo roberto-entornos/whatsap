@@ -1,64 +1,101 @@
 import React, { useState } from 'react';
-import { supabase } from '../supabaseClient';
+
+const supabaseUrl = 'https://qlxxdrbxcjofttwxbpwr.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFseHhkcmJ4Y2pvZnR0d3hicHdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1OTUxMzMsImV4cCI6MjA5NDE3MTEzM30.s9xGl4QUebBUwR6PCFeR4KPsZlpwRgF-1NPdpaQu3zo';
 
 function Login({ iniciarSesion }) {
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
   const [contrasena, setContrasena] = useState('');
   const [registro, setregistro] = useState(false);
-  const [error, setError] = useState('');
-  const [mensajeExito, setMensajeExito] = useState('');
 
   const procesarFormulario = async (e) => {
     e.preventDefault();
-    setError('');
-    setMensajeExito('');
 
-    if (registro) {
-      const emailFalso = `${telefono}@whatsapp.com`;
-      const { data, error } = await supabase.auth.signUp({
-        email: emailFalso,
-        password: contrasena,
+    let emailFalso = telefono + "@whatsapp.com";
+
+    if (registro === true) {
+      let peticionRegistro = await fetch(supabaseUrl + '/auth/v1/signup', {
+        method: 'POST',
+        headers: {
+          'apikey': supabaseKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: emailFalso,
+          password: contrasena
+        })
       });
-      if (error) {
-        let msg = error.message;
-        if (msg.includes('Password should be at least')) {
-          msg = "Contraseña demasiado corta. Por favor, ajusta el mínimo permitido en tu panel de Supabase.";
-        } else if (msg.includes('User already registered') || msg.includes('already been registered')) {
-          msg = "Este correo ya está registrado.";
-        }
-        setError(msg);
-      } else {
-        const colores = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'];
-        const colorAleatorio = colores[Math.floor(Math.random() * colores.length)];
+      let respuestaRegistro = await peticionRegistro.json();
 
-        const { error: errorInsert } = await supabase.from('usuarios').insert([{
-          id: data.user.id,
-          nombre: nombre,
-          correo: emailFalso,
-          telefono: telefono,
-          color: colorAleatorio
-        }]);
+      if (peticionRegistro.ok === false) {
+        let mensajeDeError = respuestaRegistro.msg || respuestaRegistro.error_description || respuestaRegistro.message || "";
 
-        if (errorInsert) {
-          setError("Usuario creado, pero hubo un error al guardar el perfil: " + errorInsert.message);
+        if (mensajeDeError.includes('Password should be at least') === true) {
+          alert("La contraseña es demasiado corta (mínimo 6 caracteres).");
+        } else if (mensajeDeError.includes('already registered') === true || mensajeDeError.includes('already exists') === true) {
+          alert("Este teléfono ya está registrado.");
         } else {
-          setMensajeExito("¡Registro completado! Ahora inicia sesión.");
-          setregistro(false);
+          alert("Error al registrarse: " + mensajeDeError);
+        }
+      } else {
+        let colores = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'];
+        let numeroAleatorio = Math.floor(Math.random() * colores.length);
+        let colorElegido = colores[numeroAleatorio];
+
+        let peticionGuardar = await fetch(supabaseUrl + '/rest/v1/usuarios', {
+          method: 'POST',
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': 'Bearer ' + supabaseKey,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify({
+            id: respuestaRegistro.user.id,
+            nombre: nombre,
+            correo: emailFalso,
+            telefono: telefono,
+            color: colorElegido
+          })
+        });
+
+        let respuestaGuardar = await peticionGuardar.json();
+
+        if (peticionGuardar.ok === false) {
+          alert("Error al guardar el perfil de usuario.");
+        } else {
+          alert("¡Registro completado!");
           setNombre('');
+          setTelefono('');
           setContrasena('');
         }
       }
     } else {
-      const emailFalso = `${telefono}@whatsapp.com`;
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: emailFalso,
-        password: contrasena,
+      let peticionLogin = await fetch(supabaseUrl + '/auth/v1/token?grant_type=password', {
+        method: 'POST',
+        headers: {
+          'apikey': supabaseKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: emailFalso,
+          password: contrasena
+        })
       });
-      if (error) {
-        setError("Correo o contraseña incorrectos");
+
+      let respuestaLogin = await peticionLogin.json();
+
+      if (peticionLogin.ok === false) {
+        let mensajeError = respuestaLogin.msg || respuestaLogin.error_description || "";
+
+        if (mensajeError.includes("Invalid login credentials") === true) {
+          alert("El número de teléfono o la contraseña no son correctos.");
+        } else {
+          alert("Error al iniciar sesión: " + mensajeError);
+        }
       } else {
-        iniciarSesion(data.user);
+        iniciarSesion(respuestaLogin);
       }
     }
   };
@@ -69,9 +106,6 @@ function Login({ iniciarSesion }) {
         <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">
           {registro ? 'Crear Cuenta' : 'Iniciar Sesión'} en WhatsApp
         </h2>
-
-        {error && <p className="text-red-500 mb-4 text-sm text-center">{error}</p>}
-        {mensajeExito && <p className="text-green-600 mb-4 text-sm text-center font-semibold">{mensajeExito}</p>}
 
         <form onSubmit={procesarFormulario} className="flex flex-col gap-4">
           {registro && (
@@ -112,7 +146,13 @@ function Login({ iniciarSesion }) {
         <p className="mt-6 text-center text-sm text-gray-600">
           {registro ? '¿Ya tienes cuenta? ' : '¿No tienes cuenta? '}
           <button
-            onClick={() => setregistro(!registro)}
+            onClick={(e) => {
+              e.preventDefault();
+              setNombre('');
+              setTelefono('');
+              setContrasena('');
+              setregistro(!registro);
+            }}
             className="text-blue-500 hover:underline font-semibold cursor-pointer"
           >
             {registro ? 'Inicia sesión' : 'Regístrate aquí'}
